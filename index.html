@@ -1,1 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanceBot 3.0</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; --inv-purple: #7c3aed; --pdf-red: #e11d48; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; color: var(--text); }
+        
+        .card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 650px; }
+        .input-label { font-size: 0.8rem; font-weight: bold; color: #64748b; margin-bottom: 5px; display: block; }
+        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; margin-bottom: 15px; }
+        textarea { height: 80px; font-family: 'Fira Code', monospace; resize: none; font-size: 0.85rem; }
+        
+        .brand-group { display: grid; grid-template-columns: 100px 1fr; gap: 15px; align-items: end; margin-bottom: 15px; }
+        .logo-box { width: 100px; height: 100px; border: 2px dashed #cbd5e1; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; background: #000; position: relative; }
+        .logo-box img { width: 100%; height: 100%; object-fit: cover; }
+        .logo-box span { color: white; font-size: 0.7rem; position: absolute; text-align: center; padding: 5px; }
 
+        .settings-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; background: #f1f5f9; padding: 15px; border-radius: 10px; }
+        
+        .sig-container { border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; position: relative; margin-bottom: 15px; }
+        canvas { width: 100%; height: 120px; cursor: crosshair; display: block; }
+        .sig-controls { display: flex; justify-content: flex-end; padding: 5px; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 12px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; color: white; transition: 0.2s; }
+        .btn-inv { background: var(--inv-purple); }
+        .btn-pdf { background: var(--pdf-red); grid-column: span 2; display: none; margin-top: 10px; }
+        .btn-clear-sig { background: #94a3b8; font-size: 0.7rem; padding: 5px 10px; }
+
+        #output-area { margin-top: 30px; border-top: 2px solid #1e293b; display: none; padding-top: 25px; }
+        .invoice-header { display: flex; align-items: center; gap: 20px; margin-bottom: 25px; }
+        .print-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
+        
+        /* SMALLER DUE DATE STYLE */
+        .due-date-text { font-size: 0.7rem; color: #64748b; margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .grid-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .table-head { font-weight: bold; border-bottom: 2px solid #1e293b; }
+        .summary-box { margin-top: 20px; background: #f8fafc; padding: 15px; border-radius: 12px; }
+        .total-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 1.5rem; border-top: 2px solid #1e293b; margin-top: 10px; padding-top: 10px; }
+        
+        .notes-display { margin-top: 20px; font-size: 0.85rem; font-style: italic; color: #475569; min-height: 20px; }
+        .signature-display { margin-top: 50px; display: flex; flex-direction: column; align-items: flex-end; }
+        .sig-wrap { text-align: center; width: 220px; }
+        .sig-label { font-size: 0.75rem; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px; display: block; }
+        .signature-display img { max-width: 200px; height: auto; display: block; margin: 0 auto; }
+
+        @media print { 
+            .no-print, .brand-group, .settings-row, .sig-container, .controls, .input-label, textarea, input, h2 { display: none !important; } 
+            body { background: white; padding: 0; }
+            .card { box-shadow: none; padding: 0; width: 100%; max-width: 100%; } 
+            #output-area { display: block !important; border-top: none; margin-top: 0; } 
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 class="no-print">🤖 FinanceBot 3.0</h2>
+    
+    <div class="brand-group no-print">
+        <div class="logo-box" onclick="document.getElementById('logoInput').click()">
+            <span id="logoText">ADD LOGO</span>
+            <img id="previewImg" style="display:none">
+        </div>
+        <div>
+            <label class="input-label">YOUR COMPANY NAME</label>
+            <input type="text" id="companyName" placeholder="Your Business" oninput="runCalculation()">
+        </div>
+        <input type="file" id="logoInput" hidden accept="image/*" onchange="handleLogo(this)">
+    </div>
+
+    <label class="input-label no-print">CLIENT NAME</label>
+    <input type="text" id="clientName" placeholder="Bill To: Client Name" oninput="runCalculation()" class="no-print">
+
+    <label class="input-label no-print">ITEMS (Name, Price, Qty)</label>
+    <textarea id="rawInput" placeholder="Consulting, 150, 2" oninput="runCalculation()" class="no-print"></textarea>
+
+    <div class="settings-row no-print">
+        <div><label class="input-label">TAX (%)</label><input type="number" id="taxRate" value="10" oninput="runCalculation()"></div>
+        <div><label class="input-label">CURRENCY</label><select id="currency" onchange="runCalculation()"><option value="AUD">AUD ($)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="GBP">GBP (£)</option></select></div>
+        <div><label class="input-label">DUE DATE</label><input type="date" id="dueDate" oninput="runCalculation()"></div>
+    </div>
+
+    <label class="input-label no-print">NOTES / THANK YOU MESSAGE</label>
+    <textarea id="noteInput" class="no-print" placeholder="Thank you for your business!" oninput="runCalculation()" style="height:60px; font-family:inherit;"></textarea>
+
+    <label class="input-label no-print">DIGITAL SIGNATURE</label>
+    <div class="sig-container no-print">
+        <canvas id="sig-pad"></canvas>
+        <div class="sig-controls"><button class="btn-clear-sig" onclick="clearSignature()">Clear Signature</button></div>
+    </div>
+
+    <div class="controls no-print">
+        <button class="btn-inv" onclick="saveINV()">💾 Save .inv</button>
+        <button class="btn-inv" onclick="document.getElementById('loader').click()">📂 Open .inv</button>
+        <input type="file" id="loader" hidden accept=".inv" onchange="loadINV(this)">
+        <button class="btn-pdf" id="pdfBtn" onclick="window.print()">📄 Save as PDF</button>
+    </div>
+
+    <div id="output-area">
+        <div class="invoice-header">
+            <img id="printLogo" class="print-logo" style="display:none">
+            <div>
+                <h1 id="inv_header_name" style="margin:0; color: #1e293b; text-transform: uppercase; line-height: 1;">INVOICE</h1>
+                <p id="display_due" class="due-date-text"></p>
+                <p id="display_client" style="margin: 10px 0 0 0; font-weight: 500; color: #475569;"></p>
+            </div>
+        </div>
+
+        <div class="table-head grid-row"><span>Item</span><span>Price</span><span>Qty</span><span>Total</span></div>
+        <div id="itemContainer"></div>
+
+        <div class="summary-box">
+            <div style="display:flex; justify-content:space-between"><span>Subtotal</span><span id="resSub"></span></div>
+            <div style="display:flex; justify-content:space-between"><span>Tax</span><span id="resTax"></span></div>
+            <div class="total-row"><span>Total</span><span id="resTotal"></span></div>
+        </div>
+
+        <div id="display_notes" class="notes-display"></div>
+
+        <div class="signature-display" id="sig-display-area" style="display:none">
+            <div class="sig-wrap">
+                <span class="sig-label">Authorized Signature</span>
+                <img id="sigImage">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentLogoData = null;
+    const canvas = document.getElementById('sig-pad');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    const BOLDNESS = 4;
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    function start(e) { drawing = true; draw(e); }
+    function end() { drawing = false; ctx.beginPath(); updateSigDisplay(); }
+    function draw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.lineWidth = BOLDNESS; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000';
+        ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+    }
+    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', draw); window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', draw); canvas.addEventListener('touchend', end);
+
+    function clearSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); updateSigDisplay(); }
+    function updateSigDisplay() {
+        const isEmpty = ctx.getImageData(0,0,canvas.width,canvas.height).data.every(p => p === 0);
+        document.getElementById('sig-display-area').style.display = isEmpty ? 'none' : 'block';
+        if(!isEmpty) document.getElementById('sigImage').src = canvas.toDataURL();
+    }
+
+    function handleLogo(input) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            currentLogoData = e.target.result;
+            document.getElementById('previewImg').src = currentLogoData; document.getElementById('previewImg').style.display = 'block';
+            document.getElementById('printLogo').src = currentLogoData; document.getElementById('printLogo').style.display = 'block';
+            document.getElementById('logoText').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+
+    function runCalculation() {
+        const cur = document.getElementById('currency').value;
+        const taxR = parseFloat(document.getElementById('taxRate').value) || 0;
+        const cName = document.getElementById('companyName').value.trim();
+        const due = document.getElementById('dueDate').value;
+        
+        document.getElementById('inv_header_name').innerText = cName || "INVOICE";
+        document.getElementById('display_client').innerText = document.getElementById('clientName').value ? "Bill To: " + document.getElementById('clientName').value : "";
+        document.getElementById('display_notes').innerText = document.getElementById('noteInput').value;
+        
+        // Display smaller due date
+        document.getElementById('display_due').innerText = due ? "DUE BY: " + due : "";
+
+        const container = document.getElementById('itemContainer');
+        container.innerHTML = '';
+        let subtotal = 0;
+
+        document.getElementById('rawInput').value.split('\n').forEach(line => {
+            const parts = line.split(',');
+            if (parts.length >= 2) {
+                const p = parseFloat(parts[1].replace(/[^\d.-]/g, '')) || 0;
+                const q = parseFloat(parts[2]) || 1;
+                const total = p * q;
+                if (parts[0].trim()) {
+                    subtotal += total;
+                    container.innerHTML += `<div class="grid-row"><span>${parts[0].trim()}</span><span>${fmt(p, cur)}</span><span>${q}</span><span style="font-weight:bold">${fmt(total, cur)}</span></div>`;
+                }
+            }
+        });
+
+        const taxAmt = subtotal * (taxR / 100);
+        document.getElementById('resSub').innerText = fmt(subtotal, cur);
+        document.getElementById('resTax').innerText = fmt(taxAmt, cur);
+        document.getElementById('resTotal').innerText = fmt(subtotal + taxAmt, cur);
+        document.getElementById('output-area').style.display = subtotal > 0 ? 'block' : 'none';
+        document.getElementById('pdfBtn').style.display = subtotal > 0 ? 'block' : 'none';
+    }
+
+    function fmt(n, c) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(n); }
+
+    function saveINV() {
+        const d = { 
+            logo: currentLogoData, sig: canvas.toDataURL(), 
+            company: document.getElementById('companyName').value, 
+            client: document.getElementById('clientName').value,
+            items: document.getElementById('rawInput').value, 
+            tax: document.getElementById('taxRate').value, 
+            cur: document.getElementById('currency').value,
+            notes: document.getElementById('noteInput').value,
+            due: document.getElementById('dueDate').value
+        };
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], {type: 'application/json'}));
+        a.download = 'invoice.inv'; a.click();
+    }
+
+    function loadINV(input) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const d = JSON.parse(e.target.result);
+            document.getElementById('companyName').value = d.company || "";
+            document.getElementById('clientName').value = d.client || "";
+            document.getElementById('rawInput').value = d.items || "";
+            document.getElementById('taxRate').value = d.tax || 10;
+            document.getElementById('currency').value = d.cur || "AUD";
+            document.getElementById('noteInput').value = d.notes || "";
+            document.getElementById('dueDate').value = d.due || "";
+            if (d.logo) {
+                currentLogoData = d.logo;
+                document.getElementById('previewImg').src = d.logo; document.getElementById('previewImg').style.display = 'block';
+                document.getElementById('printLogo').src = d.logo; document.getElementById('printLogo').style.display = 'block';
+                document.getElementById('logoText').style.display = 'none';
+            }
+            if (d.sig) {
+                const img = new Image(); img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); updateSigDisplay(); };
+                img.src = d.sig;
+            }
+            runCalculation();
+        };
+        reader.readAsText(input.files[0]);
+    }
+    
+    canvas.width = canvas.offsetWidth;
+    runCalculation();
+</script>
+</body>
+</html>
